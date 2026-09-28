@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PropAgent MCP — Multi-Agent Property Move-In / Move-Out System</title>
+  <!-- Tailwind CSS CDN (Zero-build requirement) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .animate-pulse-subtle { animation: pulse-subtle 2s infinite ease-in-out; }
+    .chat-bubble-user {
+      background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+    }
+    .chat-bubble-bot {
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- Header with Brand & Demo Persona Switcher -->
+  <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-50 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-emerald-500/20">
+        <i class="fa-solid fa-building-user text-lg"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg text-white flex items-center gap-2">
+          PropAgent <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">MCP Multi-Agent</span>
+        </h1>
+        <p class="text-xs text-slate-400">Greenwood Estates RWA • Autonomous Move-In / Move-Out System</p>
+      </div>
+    </div>
+
+    <!-- DEMO PERSONA SWITCHER (Top Bar) -->
+    <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 p-1 rounded-2xl shadow-inner text-xs font-medium overflow-x-auto">
+      <span class="text-[11px] text-slate-400 uppercase tracking-wider px-2 font-semibold">Demo Role:</span>
+      <button onclick="switchPersona('tenant')" id="persona-btn-tenant" class="persona-btn px-3 py-1.5 rounded-xl flex items-center gap-2 transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+        <i class="fa-solid fa-user"></i>
+        <span>Tenant: Priya</span>
+      </button>
+      <button onclick="switchPersona('owner')" id="persona-btn-owner" class="persona-btn px-3 py-1.5 rounded-xl flex items-center gap-2 transition text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-house-user"></i>
+        <span>Owner: Vikram</span>
+        <span id="badge-owner-pending" class="hidden px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">0</span>
+      </button>
+      <button onclick="switchPersona('admin')" id="persona-btn-admin" class="persona-btn px-3 py-1.5 rounded-xl flex items-center gap-2 transition text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>Admin Desk</span>
+        <span id="badge-admin-pending" class="hidden px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold animate-pulse">0</span>
+      </button>
+      <button onclick="switchPersona('security')" id="persona-btn-security" class="persona-btn px-3 py-1.5 rounded-xl flex items-center gap-2 transition text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-id-badge"></i>
+        <span>Gate Security</span>
+      </button>
+      <button onclick="switchPersona('mcp-tools')" id="persona-btn-mcp-tools" class="persona-btn px-3 py-1.5 rounded-xl flex items-center gap-2 transition text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-code"></i>
+        <span>MCP Inspector</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Bar (Preserves exact DOM strings for test compliance) -->
+  <div class="bg-slate-950 border-b border-slate-800 px-6">
+    <nav class="flex space-x-2 sm:space-x-4 overflow-x-auto py-2 text-sm font-medium">
+      <button onclick="switchTab('tenant')" id="tab-btn-tenant" class="tab-btn px-4 py-1.5 rounded-lg text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 transition">
+        <i class="fa-solid fa-truck-ramp-box"></i> Tenant Portal
+      </button>
+      <button onclick="switchTab('owner')" id="tab-btn-owner" class="tab-btn px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition">
+        <i class="fa-solid fa-key"></i> Owner NOC Desk
+      </button>
+      <button onclick="switchTab('admin-config')" id="tab-btn-admin-config" class="tab-btn px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition">
+        <i class="fa-solid fa-sliders"></i> Admin Config Page
+      </button>
+      <button onclick="switchTab('directory')" id="tab-btn-directory" class="tab-btn px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition">
+        <i class="fa-solid fa-address-book"></i> Resident Directory & Refresh
+      </button>
+      <button onclick="switchTab('security')" id="tab-btn-security" class="tab-btn px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition">
+        <i class="fa-solid fa-shield-halved"></i> Gate Security Scanner
+      </button>
+      <button onclick="switchTab('mcp-tools')" id="tab-btn-mcp-tools" class="tab-btn px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition">
+        <i class="fa-solid fa-code"></i> MCP & Agent Events
+      </button>
+    </nav>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+
+    <!-- TAB 1: TENANT PORTAL (Chat Experience & Quick Form) -->
+    <section id="tab-content-tenant" class="tab-content space-y-6">
+      
+      <!-- Persona Context Banner -->
+      <div class="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-teal-950/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-user-circle"></i>
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-white">Logged in as: <span class="text-emerald-400">Priya Nair</span> (Incoming Resident)</div>
+            <div class="text-xs text-slate-400">Chat with the Tenant Representative Agent below to check bylaws, find allowed slots, and submit your move request.</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="toggleTenantMode('chat')" id="btn-mode-chat" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-comments"></i> Conversational Chat
+          </button>
+          <button onclick="toggleTenantMode('form')" id="btn-mode-form" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-list-check"></i> Direct Form
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Column: Conversational Chat Intake -->
+        <div id="tenant-chat-container" class="lg:col-span-6 bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col h-[620px]">
+          <div class="border-b border-slate-800/80 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-robot"></i>
+              </span>
+              <div>
+                <h3 class="text-sm font-semibold text-white">Tenant Concierge Agent</h3>
+                <p class="text-[11px] text-slate-400">Bylaws verification, slot negotiation & elevator locking</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Online
+            </span>
+          </div>
+
+          <!-- Chat Message Feed -->
+          <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-3.5 text-xs text-slate-200">
+            <!-- Welcome message -->
+            <div class="flex items-start gap-2.5">
+              <div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-robot"></i>
+              </div>
+              <div class="chat-bubble-bot p-3 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 leading-relaxed shadow-sm">
+                Hello Priya! 👋 I am your <strong>Tenant Representative Agent</strong>. I can assist you with scheduling your move into Greenwood Estates.<br><br>
+                Tell me what flat you're moving into, your preferred shifting date, time slot, and moving truck size!
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick-Reply Suggestion Chips -->
+          <div class="py-2 px-1 border-t border-slate-800/80 flex flex-wrap gap-1.5 text-[11px]">
+            <button onclick="handleQuickChip('Move into Flat T1-101 this Saturday 9 AM with 14ft Truck')" class="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700/60 transition">
+              💡 Move in T1-101 Sat 9 AM (14ft Truck)
+            </button>
+            <button onclick="handleQuickChip('Can I shift into Flat T1-101 this Sunday at 10 AM?')" class="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-300 text-slate-300 border border-slate-700/60 transition">
+              ⚠️ Test Sunday Curfew (Sunday 10 AM)
+            </button>
+            <button onclick="handleQuickChip('I want to bring a 40ft container truck')" class="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 border border-slate-700/60 transition">
+              ⚠️ Test Container Limit (40ft Container)
+            </button>
+          </div>
+
+          <!-- Confirmation Card (appears when all parameters are ready) -->
+          <div id="chat-confirm-box" class="hidden p-3.5 mb-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs space-y-2">
+            <div class="font-bold text-emerald-400 flex items-center justify-between">
+              <span>📋 Shift Dossier Ready for Submission</span>
+              <span class="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-300">Bylaws Passed</span>
+            </div>
+            <div id="chat-confirm-details" class="text-slate-300 text-[11px] leading-relaxed"></div>
+            <button onclick="submitFromChat()" id="btn-submit-chat-req" class="w-full py-2 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold flex items-center justify-center gap-2 transition shadow">
+              <i class="fa-solid fa-lock"></i> Submit Request & Lock Service Elevator
+            </button>
+          </div>
+
+          <!-- Chat Input -->
+          <form onsubmit="handleChatSubmit(event)" class="flex gap-2">
+            <input type="text" id="chat-input" placeholder="Type your move request here... (e.g. Move in to T1-101 Saturday morning)" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <button type="submit" id="btn-send-chat" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </form>
+        </div>
+
+        <!-- Left Column Alternate: Direct Form (Hidden by default) -->
+        <div id="tenant-form-container" class="hidden lg:col-span-6 bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+          <div class="border-b border-slate-800/80 pb-4">
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-calendar-plus"></i>
+              </span>
+              Schedule Move-In / Move-Out Form
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Tenant Agent coordinates slot checks, lift locks, and owner approvals.</p>
+          </div>
+
+          <form id="shift-request-form" onsubmit="handleShiftSubmit(event)" class="space-y-4 text-sm">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Move Type</label>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="cursor-pointer border border-slate-700/80 rounded-xl p-3 flex items-center justify-center gap-2 hover:border-emerald-500 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 has-[:checked]:text-emerald-400">
+                  <input type="radio" name="move_type" value="MOVE_IN" checked class="hidden">
+                  <i class="fa-solid fa-door-open"></i> Move-In (Inward)
+                </label>
+                <label class="cursor-pointer border border-slate-700/80 rounded-xl p-3 flex items-center justify-center gap-2 hover:border-emerald-500 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 has-[:checked]:text-emerald-400">
+                  <input type="radio" name="move_type" value="MOVE_OUT" class="hidden">
+                  <i class="fa-solid fa-door-closed"></i> Move-Out (Outward)
+                </label>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Target Flat</label>
+                <select id="input-flat-id" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="T1-101">Flat T1-101 (Vacant)</option>
+                  <option value="T1-102">Flat T1-102 (Occupied - David Chen)</option>
+                  <option value="T2-201">Flat T2-201 (Dues Pending ₹1,500)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Resident Profile</label>
+                <select id="input-resident-id" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="res-tenant-new">Priya Nair (Incoming)</option>
+                  <option value="res-tenant-102">David Chen (Current Tenant)</option>
+                  <option value="res-owner-201">Rajesh Nambiar (Owner)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Shift Date</label>
+                <input type="date" id="input-shift-date" value="2026-10-03" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                <span class="text-[10px] text-slate-500">Note: Sundays prohibited</span>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Slot Window</label>
+                <select id="input-slot-window" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="09:00-13:00">09:00 - 13:00 (Morning)</option>
+                  <option value="14:00-18:00">14:00 - 18:00 (Afternoon)</option>
+                  <option value="19:00-22:00">19:00 - 22:00 (Disallowed)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Vehicle Type</label>
+                <select id="input-vehicle-type" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="14FT_TRUCK">14ft Medium Truck</option>
+                  <option value="VAN">Tempo / Small Van</option>
+                  <option value="CONTAINER">Container (>14ft - Prohibited)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Vehicle Reg No</label>
+                <input type="text" id="input-vehicle-no" value="KA-01-MJ-4040" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Movers Agency</label>
+              <input type="text" id="input-mover-details" value="Agarwal Packers & Movers (Lead: Ramesh, +91-9876543210)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <button type="submit" id="btn-submit-shift" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition">
+              <i class="fa-solid fa-paper-plane"></i> Launch Multi-Agent Workflow
+            </button>
+          </form>
+        </div>
+
+        <!-- Right Column: Status Feed & Active Gate Pass -->
+        <div class="lg:col-span-6 space-y-6">
+          
+          <!-- Orchestration Status Banner -->
+          <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-network-wired text-emerald-400"></i> Request Status & Lifecycle
+              </h3>
+              <span id="orchestration-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-slate-800 text-slate-400">
+                No active request
+              </span>
+            </div>
+
+            <div id="workflow-events-container" class="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 text-xs">
+              <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 text-center">
+                Submit a move request via the Chat or Form to view live agent coordination.
+              </div>
+            </div>
+          </div>
+
+          <!-- Digital Gate Pass Card -->
+          <div id="gate-pass-card" class="hidden bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950/40 border border-emerald-500/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+            <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+              <div>
+                <span class="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">Society Security Authorization</span>
+                <h4 id="gp-pass-title" class="text-base font-bold text-white">DIGITAL GATE PASS</h4>
+              </div>
+              <span id="gp-pass-id" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700 font-mono text-xs text-emerald-400 font-bold">
+                GP-ACTIVE
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-xs mb-5">
+              <div>
+                <span class="text-slate-500 block">Assigned 6-Digit OTP</span>
+                <span id="gp-otp" class="text-2xl font-mono font-extrabold text-emerald-300 tracking-widest">------</span>
+              </div>
+              <div>
+                <span class="text-slate-500 block">Valid Slot Window</span>
+                <span id="gp-slot" class="font-semibold text-white">---</span>
+              </div>
+              <div>
+                <span class="text-slate-500 block">Authorized Truck</span>
+                <span id="gp-vehicle" class="font-mono text-white">---</span>
+              </div>
+              <div>
+                <span class="text-slate-500 block">Elevator Access</span>
+                <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check"></i> Freight Lift Locked</span>
+              </div>
+            </div>
+
+            <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+              <span>Present this 6-digit OTP code to the Main Gate Security Guard on shifting morning.</span>
+              <button onclick="switchPersona('security')" class="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold text-xs transition">
+                Go to Gate Scanner →
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: OWNER NOC DESK -->
+    <section id="tab-content-owner" class="tab-content hidden space-y-6">
+      
+      <!-- Owner Context Banner -->
+      <div class="bg-gradient-to-r from-cyan-950/40 via-slate-900 to-blue-950/40 border border-cyan-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-house-user"></i>
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-white">Logged in as: <span class="text-cyan-400">Vikram Malhotra</span> (Owner of Flat T1-101)</div>
+            <div class="text-xs text-slate-400">Review incoming tenancy contracts, verify zero-dues clearance, and grant or reject Owner NOCs.</div>
+          </div>
+        </div>
+        <button onclick="loadRequests()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-rotate-right"></i> Refresh Queue
+        </button>
+      </div>
+
+      <!-- Pending NOC Approvals for Owner -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-file-signature text-cyan-400"></i> Pending Tenancy NOC Requests
+            </h2>
+            <p class="text-xs text-slate-400">Requests requiring your explicit owner verification and clearance.</p>
+          </div>
+        </div>
+
+        <div id="owner-pending-cards-container" class="space-y-4">
+          <!-- Dynamically populated pending requests -->
+          <div class="p-6 text-center text-slate-500 text-sm">Loading pending NOC requests...</div>
+        </div>
+      </div>
+
+      <!-- Historical Requests Table -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <h3 class="text-sm font-semibold text-white">All Society Move Requests Log</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="text-slate-400 border-b border-slate-800 bg-slate-900/50">
+              <tr>
+                <th class="p-3">Request ID</th>
+                <th class="p-3">Flat</th>
+                <th class="p-3">Type</th>
+                <th class="p-3">Date & Slot</th>
+                <th class="p-3">Dues</th>
+                <th class="p-3">Owner NOC</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Action</th>
+              </tr>
+            </thead>
+            <tbody id="owner-requests-tbody" class="divide-y divide-slate-800/60 text-slate-300">
+              <tr><td colspan="8" class="p-4 text-center text-slate-500">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 3: ADMIN CONFIG & APPROVALS PAGE -->
+    <section id="tab-content-admin-config" class="tab-content hidden space-y-6">
+      
+      <!-- Admin Context Banner -->
+      <div class="bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-white">Logged in as: <span class="text-purple-400">Society Admin Desk</span> (Committee Secretary)</div>
+            <div class="text-xs text-slate-400">Final society clearance, bylaw policy configuration, and resident directory synchronization.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Society Sign-Off Queue -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-stamp text-purple-400"></i> Pending Society Clearance Queue
+            </h2>
+            <p class="text-xs text-slate-400">Move dossiers verified by Property Owner awaiting final Admin Gate Pass issuance.</p>
+          </div>
+        </div>
+
+        <div id="admin-pending-cards-container" class="space-y-4">
+          <div class="p-6 text-center text-slate-500 text-sm">No requests awaiting society clearance.</div>
+        </div>
+      </div>
+
+      <!-- Admin Config Page: Bylaws Configuration Form -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <div class="border-b border-slate-800/80 pb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-sliders"></i>
+              </span>
+              Admin Config Page — Society Shifting Bylaws
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Configure allowed shifting days, hours of the day, lift deposit, and shifting fees.</p>
+          </div>
+          <button onclick="saveBylawsConfig()" id="btn-save-bylaws" class="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-500/20 transition">
+            <i class="fa-solid fa-floppy-disk"></i> Save Bylaw Rules
+          </button>
+        </div>
+
+        <form id="bylaws-config-form" onsubmit="event.preventDefault(); saveBylawsConfig();" class="space-y-5 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Allowed Shifting Days</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2" id="allowed-days-container">
+              <!-- Checkboxes populated dynamically -->
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Daily Shifting Start Time</label>
+              <input type="time" id="cfg-start-time" value="09:00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Daily Shifting End Time</label>
+              <input type="time" id="cfg-end-time" value="18:00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Max Concurrent Moves / Tower</label>
+              <input type="number" id="cfg-max-concurrent" value="1" min="1" max="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Move-In Fee (₹)</label>
+              <input type="number" id="cfg-move-in-fee" value="2000" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Move-Out Fee (₹)</label>
+              <input type="number" id="cfg-move-out-fee" value="1000" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Lift Damage Deposit (₹)</label>
+              <input type="number" id="cfg-lift-deposit" value="5000" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            </div>
+          </div>
+        </form>
+      </div>
+
+    </section>
+
+    <!-- TAB 4: RESIDENT DIRECTORY & REFRESHER -->
+    <section id="tab-content-directory" class="tab-content hidden space-y-6">
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-building text-emerald-400"></i> Flats & Resident Directory
+            </h2>
+            <p class="text-xs text-slate-400">Live occupancy registry synced with completed moves and gate check-ins.</p>
+          </div>
+          <button onclick="triggerDirectoryRefresh()" id="btn-refresh-directory" class="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-semibold text-xs flex items-center gap-2 transition">
+            <i class="fa-solid fa-arrows-rotate"></i> Refresh Directory ("Refresher")
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="text-slate-400 border-b border-slate-800 bg-slate-900/50">
+              <tr>
+                <th class="p-3">Flat ID</th>
+                <th class="p-3">Tower</th>
+                <th class="p-3">Occupancy Status</th>
+                <th class="p-3">Owner Details</th>
+                <th class="p-3">Current Tenant</th>
+                <th class="p-3">Maintenance Dues</th>
+              </tr>
+            </thead>
+            <tbody id="directory-flats-tbody" class="divide-y divide-slate-800/60 text-slate-300">
+              <tr><td colspan="6" class="p-4 text-center text-slate-500">Loading directory...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: GATE SECURITY SCANNER -->
+    <section id="tab-content-security" class="tab-content hidden space-y-6">
+      
+      <!-- Security Context Banner -->
+      <div class="bg-gradient-to-r from-amber-950/40 via-slate-900 to-orange-950/40 border border-amber-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-id-badge"></i>
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-white">Main Gate Security Terminal (Guard Checkpoint)</div>
+            <div class="text-xs text-slate-400">Validate 6-digit OTP codes presented by arriving moving trucks and record arrival.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Guard Scanner Card -->
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+          <div class="border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-qrcode text-amber-400"></i> Enter 6-Digit Gate OTP
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Driver or resident presents the OTP upon arrival at the gate.</p>
+          </div>
+
+          <form onsubmit="handleSecurityVerify(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gate Pass OTP / Token</label>
+              <input type="text" id="input-security-otp" placeholder="e.g. 244882" maxlength="10" class="w-full text-center text-2xl font-mono tracking-widest bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-amber-300 focus:outline-none focus:border-amber-500 uppercase font-bold">
+            </div>
+
+            <!-- Keypad Simulator for quick testing -->
+            <div class="grid grid-cols-3 gap-2 text-sm font-mono font-bold">
+              <button type="button" onclick="appendOtp('1')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">1</button>
+              <button type="button" onclick="appendOtp('2')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">2</button>
+              <button type="button" onclick="appendOtp('3')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">3</button>
+              <button type="button" onclick="appendOtp('4')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">4</button>
+              <button type="button" onclick="appendOtp('5')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">5</button>
+              <button type="button" onclick="appendOtp('6')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">6</button>
+              <button type="button" onclick="appendOtp('7')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">7</button>
+              <button type="button" onclick="appendOtp('8')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">8</button>
+              <button type="button" onclick="appendOtp('9')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">9</button>
+              <button type="button" onclick="clearOtp()" class="py-2.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 rounded-lg border border-rose-800/40">CLR</button>
+              <button type="button" onclick="appendOtp('0')" class="py-2.5 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800">0</button>
+              <button type="button" onclick="handleSecurityVerify(event)" class="py-2.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 rounded-lg border border-emerald-800/40">GO</button>
+            </div>
+
+            <button type="submit" id="btn-verify-otp" class="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition">
+              <i class="fa-solid fa-circle-check"></i> Validate Pass & Grant Gate Entry
+            </button>
+          </form>
+        </div>
+
+        <!-- Verification Result & Directory Update Confirmation -->
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-3">Gate Checkpoint Terminal Output</h3>
+          <div id="security-verification-output" class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 text-center text-xs">
+            Awaiting pass verification...
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 6: MCP & AGENT EVENTS INSPECTOR -->
+    <section id="tab-content-mcp-tools" class="tab-content hidden space-y-6">
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-code text-indigo-400"></i> Model Context Protocol (MCP) Tool Registry
+            </h2>
+            <p class="text-xs text-slate-400">8 authoritative tools with Role-Based Access Control (RBAC) schemas.</p>
+          </div>
+          <span class="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+            JSON-RPC 2.0 stdio server ready
+          </span>
+        </div>
+
+        <div id="mcp-tools-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="p-4 text-center text-slate-500 text-xs">Loading MCP tools...</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

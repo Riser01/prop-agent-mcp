@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "prop-agent-mcp": {
+      "command": "python",
+      "args": ["-m", "src.mcp.server"],
+      "cwd": ".",
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+}
